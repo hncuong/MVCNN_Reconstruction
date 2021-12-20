@@ -2,22 +2,13 @@ from pathlib import Path
 
 import torch
 
-from mvcnn_rec.model.mvcnn_rec import MVCNNReconstruction
+# TODO update model name
+from mvcnn_rec.model.mvcnn import MVCNN
 from mvcnn_rec.data.shapenet import ShapeNetMultiview
 
 def train(model, trainloader, valloader, device, config):
-    loss_class_criterion = torch.nn.CrossEntropyLoss()
-    loss_class_criterion = loss_class_criterion.to(device)
-
-    # TODO Reconstruction loss for voxels. Change to BCEWithLogitsLoss if output is logits.
-    # loss_voxels = torch.nn.BCEWithLogitsLoss() 
-    loss_voxels_criterion = torch.nn.BCELoss()
-    loss_voxels_criterion = loss_voxels_criterion.to(device)
-
-    # TODO Weight of losses
-    loss_class_weight = config.get('loss_class_weight', 0.5)
-    loss_voxel_weight = config.get('loss_voxel_weight', 0.5)
-    voxel_thresh = config.get('voxel_thresh', 0.3)
+    loss_criterion = torch.nn.CrossEntropyLoss()
+    loss_criterion = loss_criterion.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
 
@@ -28,7 +19,6 @@ def train(model, trainloader, valloader, device, config):
     model.train()
 
     best_accuracy = 0.
-    best_val_loss = 1000.
 
     # keep track of running average of train loss for printing
     train_loss_running = 0.
@@ -37,17 +27,13 @@ def train(model, trainloader, valloader, device, config):
         for i, batch in enumerate(trainloader):
             # move batch to device
             ShapeNetMultiview.move_batch_to_device(batch, device)
-            # TODO data voxels (update name)
-            input_data, target_labels, target_voxels = batch['images'], batch['label'], batch['voxel']
+            input_data, target_labels = batch['images'], batch['label']
 
             optimizer.zero_grad()
 
-            pred_class, pred_voxels = model(input_data)
+            prediction = model(input_data)
 
-            # TODO loss voxels
-            loss_class = loss_class_criterion(pred_class, target_labels)
-            loss_voxel = loss_voxels_criterion(pred_voxels, target_voxels)
-            loss = loss_class_weight * loss_class + loss_voxel_weight * loss_voxel
+            loss = loss_criterion(prediction, target_labels)
 
             loss.backward()
 
@@ -69,49 +55,28 @@ def train(model, trainloader, valloader, device, config):
 
                 loss_total_val = 0
                 total, correct = 0, 0
-                ious = []
-
                 # forward pass and evaluation for entire validation set
                 for batch_val in valloader:
                     ShapeNetMultiview.move_batch_to_device(batch_val, device)
-                    input_data, target_labels, target_voxels = batch_val['images'], batch_val['label'], batch_val['voxel']
+                    input_data, target_labels = batch_val['images'], batch_val['label']
 
                     with torch.no_grad():
-                        # prediction = model(input_data)
-                        pred_class, pred_voxels = model(input_data)
-                    
-                    loss_total_val += loss_class_weight * loss_class_criterion(pred_class, target_labels).item() + \
-                            loss_voxel_weight * loss_voxels_criterion(pred_voxels, target_voxels).item()
-                          
-                    predicted_label = torch.argmax(pred_class, dim=1)
-                    # TODO binarize voxels prediction. Get binarize threshold from config. DONE
-                    # Assumed its is output of Sigmoid
-                    predicted_voxel = torch.where(pred_voxels > voxel_thresh, 1, 0)
+                        prediction = model(input_data)
 
-                    # Class eval
+                    predicted_label = torch.argmax(prediction, dim=1)
+
                     total += predicted_label.shape[0]
                     correct += (predicted_label == target_labels).sum().item()
-                    # TODO Voxel eval
-                    I = torch.sum(torch.logical_and(predicted_voxel == 1, target_voxels == 1))
-                    U = torch.sum(torch.logical_or(predicted_voxel == 1, target_voxels == 1))
-                    if U == 0:
-                        iou = 1  # If the union of groundtruth and prediction points is empty, then count part IoU as 1
-                    else:
-                        iou = I / float(U)
-                    ious.append(iou)
-                    
+
+                    loss_total_val += loss_criterion(prediction, target_labels).item()
 
                 accuracy = 100 * correct / total
-                # TODO: mean IoU
-                mean_IoU = torch.mean(torch.stack(ious)).item()
-                val_loss = loss_total_val / len(valloader)
 
-                print(f'[{epoch:03d}/{i:05d}] val_loss: {val_loss:.3f}, val_accuracy: {accuracy:.3f}%, val_IoU: {mean_IoU}.')
+                print(f'[{epoch:03d}/{i:05d}] val_loss: {loss_total_val / len(valloader):.3f}, val_accuracy: {accuracy:.3f}%')
 
-                # TODO change condition if needed
-                if val_loss < best_val_loss:
+                if accuracy > best_accuracy:
                     torch.save(model.state_dict(), f'mvcnn_rec/runs/{config["experiment_name"]}/model_best.ckpt')
-                    best_val_loss = val_loss
+                    best_accuracy = accuracy
 
                 # set model back to train
                 model.train()
@@ -161,7 +126,7 @@ def main(config):
 
     # Instantiate model
     # TODO: Update model later.
-    model = MVCNNReconstruction(ShapeNetMultiview.num_classes)
+    model = MVCNN(ShapeNetMultiview.num_classes)
 
     # Load model if resuming from checkpoint
     if config['resume_ckpt'] is not None:
