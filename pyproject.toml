@@ -5,7 +5,7 @@ description = "Exercises and Materials for the Lecture Machine Learning for 3D G
 authors = ["Christian Diller, Yawar Siddiqui"]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = ">=3.7,<3.9"
 jupyter = "^1.0.0"
 K3D = "^2.9.4"
 matplotlib = "^3.4.1"
@@ -19,9 +19,15 @@ pillow = "^7.2.0"
 tqdm = "^4.48.2"
 scipy = "^1.4.1"
 numpy = "^1.19.4"
+easydict = "^1.9"
+opencv-python = "4.5.4.60"
 
 [tool.poetry.dev-dependencies]
+poethepoet = "^0.11.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+get_cuda = "python -m pip install torch==1.10.1+cu113 torchvision==0.11.2+cu113 torchaudio===0.10.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html"
