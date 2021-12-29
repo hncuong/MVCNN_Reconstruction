@@ -1,0 +1,11 @@
+poetry install
+poetry run poe get_cuda
+poetry run jupyter notebook
+
+dataset downloads:
+- ShapeNet rendering images: http://cvgl.stanford.edu/data2/ShapeNetRendering.tgz
+- ShapeNet voxelized models: http://cvgl.stanford.edu/data2/ShapeNetVox32.tgz
+
+download/unpack the datasets and adjust the path_information in the config.py file accordingly:
+__C.DATASETS.SHAPENET.RENDERING_PATH = './datasets/ShapeNetRendering/%s/%s/rendering/%02d.png'
+__C.DATASETS.SHAPENET.VOXEL_PATH = './datasets/ShapeNetVox32/%s/%s/model.binvox'
