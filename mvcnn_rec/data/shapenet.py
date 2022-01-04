@@ -53,8 +53,8 @@ class ShapeNetMultiview(torch.utils.data.Dataset):
         voxel = ShapeNetMultiview.get_voxel(item)
         return {
             "name": item,
-            "item": images,
-            "voxel": voxel[np.newaxis, :, :, :],
+            "images": images,
+            "voxel": voxel,
             "label": self.class_ids[self.classes[item_class]]
         }
 
@@ -88,13 +88,15 @@ class ShapeNetMultiview(torch.utils.data.Dataset):
             #rendering_image = preprocess(rendering_image)
             #print(rendering_image.shape)
             input_image = Image.open(img_path)
+            input_image.load()
+            input_image = Image.new("RGB", input_image.size, (255, 255, 255))
             input_tensor = preprocess(input_image)
             preprocessed_images.append(input_tensor)
-        return np.asarray(preprocessed_images)
+        return torch.stack(preprocessed_images)
 
 
     @staticmethod
     def move_batch_to_device(batch, device):
-        batch["item"] = batch['item'].to(device, torch.float32)
+        batch["images"] = batch['images'].to(device, torch.float32)
         batch['voxel'] = batch['voxel'].to(device, torch.float32)
-        batch['label'] = batch['label'].to(device, torch.float32)
+        batch['label'] = batch['label'].to(device, torch.long)

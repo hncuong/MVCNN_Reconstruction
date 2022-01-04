@@ -7,7 +7,7 @@ class MVCNNReconstruction(nn.Module):
         """
         """
         super().__init__()
-        self.num_features = 12
+        self.num_features = 23
         self.encoder_image = models.resnet18(pretrained=True)
         self.reconstruction = MVCNNRec()
         self.classifier = nn.Sequential(
@@ -32,7 +32,7 @@ class MVCNNReconstruction(nn.Module):
         x_score = m(x_score)
         x_out = torch.sum(torch.mul(x_score, x_volume), dim=1)
         class_out = self.classifier(class_init)
-        return x_out, class_out
+        return class_out, x_out
 
 class MVCNNRec(nn.Module):
 

@@ -19,8 +19,25 @@ def train(model, trainloader, valloader, device, config):
     loss_voxel_weight = config.get('loss_voxel_weight', 0.5)
     voxel_thresh = config.get('voxel_thresh', 0.3)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
-
+    #optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
+    optimizer = torch.optim.Adam([
+        {
+            'params': model.classifier.parameters(),
+            'lr': config['learning_rate']
+        },
+        {
+            'params': model.reconstruction.encoder.parameters(),
+            'lr': config['learning_rate']
+        },
+        {
+            'params': model.reconstruction.decoder.parameters(),
+            'lr': config['learning_rate']
+        },
+        {
+            'params': model.reconstruction.csn.parameters(),
+            'lr': config['learning_rate']
+        },
+    ])
     # lr scheduler
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
@@ -39,11 +56,9 @@ def train(model, trainloader, valloader, device, config):
             ShapeNetMultiview.move_batch_to_device(batch, device)
             # TODO data voxels (update name)
             input_data, target_labels, target_voxels = batch['images'], batch['label'], batch['voxel']
-
+            input_data = torch.reshape(input_data, (input_data.shape[1], input_data.shape[0], input_data.shape[2], input_data.shape[3], input_data.shape[4]))
             optimizer.zero_grad()
-
             pred_class, pred_voxels = model(input_data)
-
             # TODO loss voxels
             loss_class = loss_class_criterion(pred_class, target_labels)
             loss_voxel = loss_voxels_criterion(pred_voxels, target_voxels)
@@ -75,11 +90,12 @@ def train(model, trainloader, valloader, device, config):
                 for batch_val in valloader:
                     ShapeNetMultiview.move_batch_to_device(batch_val, device)
                     input_data, target_labels, target_voxels = batch_val['images'], batch_val['label'], batch_val['voxel']
-
+                    input_data = torch.reshape(input_data, (
+                    input_data.shape[1], input_data.shape[0], input_data.shape[2], input_data.shape[3],
+                    input_data.shape[4]))
                     with torch.no_grad():
                         # prediction = model(input_data)
                         pred_class, pred_voxels = model(input_data)
-                    
                     loss_total_val += loss_class_weight * loss_class_criterion(pred_class, target_labels).item() + \
                             loss_voxel_weight * loss_voxels_criterion(pred_voxels, target_voxels).item()
                           
@@ -161,7 +177,7 @@ def main(config):
 
     # Instantiate model
     # TODO: Update model later.
-    model = MVCNNReconstruction(ShapeNetMultiview.num_classes)
+    model = MVCNNReconstruction()
 
     # Load model if resuming from checkpoint
     if config['resume_ckpt'] is not None:
