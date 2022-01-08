@@ -37,8 +37,10 @@ def train(model, trainloader, valloader, device, config):
         for i, batch in enumerate(trainloader):
             # move batch to device
             ShapeNetMultiview.move_batch_to_device(batch, device)
-            # TODO data voxels (update name)
-            input_data, target_labels, target_voxels = batch['images'], batch['label'], batch['voxel']
+            input_data, target_labels, target_voxels = batch['item'], batch['label'], batch['voxel']
+            # TODO Reshape inpute_data to [N_images, B, 3, H, W] (H, W = 222)
+            N,B,C,H,W = input_data.size()
+            input_data = input_data.view(B, N, C, H, W)
 
             optimizer.zero_grad()
 
@@ -141,7 +143,9 @@ def main(config):
         print('Using CPU')
 
     # Create Dataloaders
-    train_dataset = ShapeNetMultiview('train' if not config['is_overfit'] else 'overfit')
+    train_dataset = ShapeNetMultiview('train' if not config['is_overfit'] else 'overfit', total_views=24, 
+                                    num_views=config.get('num_views', 12), load_mode='mvcnn_rec', 
+                                    random_start_view=config.get('random_start_view', False))
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,   # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
         batch_size=config['batch_size'],   # The size of batches is defined here
@@ -150,7 +154,9 @@ def main(config):
         pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
     )
 
-    val_dataset = ShapeNetMultiview('val' if not config['is_overfit'] else 'overfit')
+    val_dataset = ShapeNetMultiview('val' if not config['is_overfit'] else 'overfit', total_views=24, 
+                                    num_views=config.get('num_views', 12), load_mode='mvcnn_rec',
+                                    random_start_view=False)
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,     # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
         batch_size=config['batch_size'],   # The size of batches is defined here
