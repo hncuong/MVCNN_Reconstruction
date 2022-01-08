@@ -8,12 +8,13 @@ class MVCNNReconstruction(nn.Module):
         """
         super().__init__()
         self.num_features = 23
+        self.num_class = 13
         self.encoder_image = models.resnet18(pretrained=True)
         self.reconstruction = MVCNNRec()
         self.classifier = nn.Sequential(
             nn.Linear(1000, 1000),
             nn.ReLU(),
-            nn.Linear(1000,self.num_features)
+            nn.Linear(1000,self.num_class)
         )
     def forward(self, x_in):
         """
