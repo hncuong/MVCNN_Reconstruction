@@ -5,3 +5,5 @@ poetry.lock
 venv/
 datasets/
 !datasets/ShapeNet_complete.json
+mvcnn_rec/runs/
+nohup.out

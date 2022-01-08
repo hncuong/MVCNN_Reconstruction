@@ -1,13 +1,17 @@
 import torch.nn as nn
 import torch
 import torchvision.models as models
-class MVCNNReconstruction(nn.Module):
 
-    def __init__(self):
+
+class MVCNNReconstruction(nn.Module):
+    """MVCNN for situmunously Classification and Reconstruction"""
+    def __init__(self, num_classes=13):
         """
         """
         super().__init__()
-        self.num_features = 12
+        self.num_features = num_classes
+        # TODO: Take chilren [:-1] here
+        # Should you share decoder with MVCNNRec. Delete this
         self.encoder_image = models.resnet18(pretrained=True)
         self.reconstruction = MVCNNRec()
         self.classifier = nn.Sequential(
@@ -17,7 +21,7 @@ class MVCNNReconstruction(nn.Module):
         )
     def forward(self, x_in):
         """
-        x_in in shape [N, 3, H, W]
+        x_in in shape [N, B, 3, H, W]
         B: Batch size
         N: Number of multiple images per shape
         """
@@ -34,14 +38,15 @@ class MVCNNReconstruction(nn.Module):
         class_out = self.classifier(class_init)
         return x_out, class_out
 
-class MVCNNRec(nn.Module):
 
-    def __init__(self):
+class MVCNNRec(nn.Module):
+    """Reconstruction head"""
+    def __init__(self, num_classes=13):
         """
         """
         super().__init__()
-        self.num_features = 12
-        self.part_res = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-4])
+        self.num_features = num_classes
+        self.part_res = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-4]) # TODO: why -4
         self.encoder = nn.Sequential(
             torch.nn.Conv2d(in_channels = 128, out_channels = 128, kernel_size = 3, stride=1, padding=1),
             torch.nn.BatchNorm2d(128),
@@ -70,7 +75,9 @@ class MVCNNRec(nn.Module):
         c = torch.cat([c_1, c_2], dim=1)
         return self.csn(c), c_2
 
+
 class MVCNNDecoder(nn.Module):
+    """Decoder from 2D features to 3D output and voxel"""
     def __init__(self):
         """
         """
@@ -101,8 +108,10 @@ class MVCNNDecoder(nn.Module):
         """
         out = self.model_1(x_in)
         return out, self.model_2(out)
-class MVCNNCSN(nn.Module):
 
+
+class MVCNNCSN(nn.Module):
+    """Contextual Scoring network"""
     def __init__(self):
         """
         """
@@ -143,12 +152,12 @@ class MVCNNCSN(nn.Module):
         N: Number of multiple images per shape
         """
         o_1 = self.conv1(x_in)
-        o_5 = o_1
+        output = o_1
         o_2 = self.conv2(o_1)
-        o_5 = torch.cat([o_5, o_2], dim=1)
+        output = torch.cat([output, o_2], dim=1)
         o_3 = self.conv3(o_2)
-        o_5 = torch.cat([o_5, o_3], dim=1)
+        output = torch.cat([output, o_3], dim=1)
         o_4 = self.conv4(o_3)
-        o_5 = torch.cat([o_5, o_4], dim=1)
-        o_5 = self.conv5(o_5)
-        return o_5
+        output = torch.cat([output, o_4], dim=1)
+        output = self.conv5(output)
+        return output
