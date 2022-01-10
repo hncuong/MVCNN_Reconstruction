@@ -31,8 +31,8 @@ def train(model, trainloader, valloader, device, config):
             input_data, target_labels = batch['item'], batch['label']
 
             # TODO Reshape inpute_data to [N_images, B, 3, H, W] (H, W = 222)
-            N,B,C,H,W = input_data.size()
-            input_data = input_data.view(B, N, C, H, W)
+            # N,B,C,H,W = input_data.size()
+            input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
 
             optimizer.zero_grad()
             prediction = model(input_data)
@@ -45,8 +45,7 @@ def train(model, trainloader, valloader, device, config):
             iteration = epoch * len(trainloader) + i
 
             if iteration % config['print_every_n'] == (config['print_every_n'] - 1):
-                # TODO Verify train loss.
-                print(f'[{epoch:03d}/{i:05d}] train_loss: {train_loss_running / config["print_every_n"]:.3f}')
+                print(f'[{epoch:03d}/{i:05d}] train_loss: {train_loss_running / config["print_every_n"]:.3f}. Loss last iter: {loss.item()}.')
                 train_loss_running = 0.
 
             # validation evaluation and logging
@@ -60,8 +59,7 @@ def train(model, trainloader, valloader, device, config):
                 for idx, batch_val in enumerate(valloader):
                     ShapeNetMultiview.move_batch_to_device(batch_val, device, load_mode='mvcnn')
                     input_data, target_labels = batch_val['item'], batch_val['label']
-                    N,B,C,H,W = input_data.size()
-                    input_data = input_data.view(B, N, C, H, W)
+                    input_data = torch.swapaxes(input_data, 0, 1) # Fixed
 
                     with torch.no_grad():
                         prediction = model(input_data)
@@ -71,9 +69,8 @@ def train(model, trainloader, valloader, device, config):
                     correct += (predicted_label == target_labels).sum().item()
                     loss_total_val += loss_criterion(prediction, target_labels).item()
 
+
                 accuracy = 100 * correct / total
-                # TODO Verify val loss.
-                print(f'Num batch val {idx}')
                 print(f'[{epoch:03d}/{i:05d}] {datetime.now()} val_loss: {loss_total_val / len(valloader):.3f}, val_accuracy: {accuracy:.3f}%')
 
                 if accuracy > best_accuracy:
@@ -100,6 +97,8 @@ def main(config):
                    'validate_every_n': print validation loss and validation accuracy every n iterations
                    'is_overfit': if the training is done on a small subset of data specified in exercise_2/split/overfit.txt,
                                  train and validation done on the same set, so error close to 0 means a good overfit. Useful for debugging.
+                   'num_views': number of views per shape, 
+                   'random_start_view': if False start_view index start from 0 else random in range [0, stride), 
     """
 
     # Declare device

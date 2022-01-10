@@ -39,8 +39,9 @@ def train(model, trainloader, valloader, device, config):
             ShapeNetMultiview.move_batch_to_device(batch, device)
             input_data, target_labels, target_voxels = batch['item'], batch['label'], batch['voxel']
             # TODO Reshape inpute_data to [N_images, B, 3, H, W] (H, W = 222)
-            N,B,C,H,W = input_data.size()
-            input_data = input_data.view(B, N, C, H, W)
+            # N,B,C,H,W = input_data.size()
+            # input_data = input_data.view(B, N, C, H, W)
+            input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
 
             optimizer.zero_grad()
 
@@ -77,6 +78,7 @@ def train(model, trainloader, valloader, device, config):
                 for batch_val in valloader:
                     ShapeNetMultiview.move_batch_to_device(batch_val, device)
                     input_data, target_labels, target_voxels = batch_val['images'], batch_val['label'], batch_val['voxel']
+                    input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
 
                     with torch.no_grad():
                         # prediction = model(input_data)

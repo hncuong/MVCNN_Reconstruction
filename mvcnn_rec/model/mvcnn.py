@@ -25,6 +25,7 @@ class MVCNN(nn.Module):
         class_init = self.encoder_image(x_in[0]) # 512, 1, 1 for (224 x 224) images
         for i in range(x_in.shape[0]-1):
             class_init = torch.max(class_init, self.encoder_image(x_in[i+1]))
+        # Reshape n_views, 512, 1, 1 -> n_views, 512
         class_init = class_init.view(class_init.shape[0], -1)
         class_out = self.classifier(class_init)
         return class_out
