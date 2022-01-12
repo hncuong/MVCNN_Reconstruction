@@ -11,13 +11,12 @@ class MVCNNReconstruction(nn.Module):
         super().__init__()
         self.num_features = num_classes
         # TODO: Take chilren [:-1] here
-        # Should you share decoder with MVCNNRec. Delete this
-        self.encoder_image = models.resnet18(pretrained=True)
+        self.encoder_image = nn.Sequential(*list(models.resnet18(pretrained=True).children())[6:-1])
         self.reconstruction = MVCNNRec()
         self.classifier = nn.Sequential(
-            nn.Linear(1000, 1000),
+            nn.Linear(512, 512),
             nn.ReLU(),
-            nn.Linear(1000,self.num_features)
+            nn.Linear(512,self.num_features)
         )
     def forward(self, x_in):
         """
@@ -25,16 +24,17 @@ class MVCNNReconstruction(nn.Module):
         B: Batch size
         N: Number of multiple images per shape
         """
-        x_score, x_volume = self.reconstruction(x_in[0])
-        class_init = self.encoder_image(x_in[0])
+        x_score, x_volume, partial_class = self.reconstruction(x_in[0])
+        class_init = self.encoder_image(partial_class)
         for i in range(x_in.shape[0]-1):
-            x_score_temp, x_volume_temp = self.reconstruction(x_in[i+1])
+            x_score_temp, x_volume_temp, partial_class = self.reconstruction(x_in[i+1])
             x_score = torch.cat([x_score, x_score_temp], dim=1)
             x_volume = torch.cat([x_volume, x_volume_temp], dim=1)
-            class_init = torch.max(class_init, self.encoder_image(x_in[i+1]))
+            class_init = torch.maximum(class_init, self.encoder_image(partial_class))
         m = nn.Softmax(dim=1)
         x_score = m(x_score)
         x_out = torch.sum(torch.mul(x_score, x_volume), dim=1)
+        class_init = class_init.view(class_init.shape[0], -1)
         class_out = self.classifier(class_init)
         return x_out, class_out
 
@@ -46,7 +46,7 @@ class MVCNNRec(nn.Module):
         """
         super().__init__()
         self.num_features = num_classes
-        self.part_res = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-4]) # TODO: why -4
+        self.part_res = nn.Sequential(*list(models.resnet18(pretrained=True).children())[:-4])
         self.encoder = nn.Sequential(
             torch.nn.Conv2d(in_channels = 128, out_channels = 128, kernel_size = 3, stride=1, padding=1),
             torch.nn.BatchNorm2d(128),
@@ -70,10 +70,11 @@ class MVCNNRec(nn.Module):
         """
         N = x_in.shape[0]
         out = self.part_res(x_in)
+        classification_out = out
         out = self.encoder(out).view(N,392,2,2,2)
         c_1, c_2  = self.decoder(out)
         c = torch.cat([c_1, c_2], dim=1)
-        return self.csn(c), c_2
+        return self.csn(c), c_2, classification_out
 
 
 class MVCNNDecoder(nn.Module):

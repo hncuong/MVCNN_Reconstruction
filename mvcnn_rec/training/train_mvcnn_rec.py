@@ -42,10 +42,10 @@ def train(model, trainloader, valloader, device, config):
             # N,B,C,H,W = input_data.size()
             # input_data = input_data.view(B, N, C, H, W)
             input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
-
+            target_voxels = torch.squeeze(target_voxels, dim = 1)
             optimizer.zero_grad()
 
-            pred_class, pred_voxels = model(input_data)
+            pred_voxels, pred_class = model(input_data)
 
             # TODO loss voxels
             loss_class = loss_class_criterion(pred_class, target_labels)
