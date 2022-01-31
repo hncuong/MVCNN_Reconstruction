@@ -7,3 +7,5 @@ datasets/
 !datasets/ShapeNet_complete.json
 mvcnn_rec/runs/
 nohup.out
+find_jupyter
+log_jupyter

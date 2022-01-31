@@ -74,7 +74,7 @@ class ShapeNetMultiview(torch.utils.data.Dataset):
             return {
                 "name": item,
                 "item": images,
-                "voxel": voxel[np.newaxis, :, :, :], # TODO check if should be new_axis here.
+                "voxel": voxel, # TODO check if should be new_axis here.
                 "label": ShapeNetMultiview.class_ids[self.classes[item_class]]
             }
         else:
