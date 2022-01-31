@@ -38,6 +38,7 @@ def train(model, trainloader, valloader, device, config):
             # N,B,C,H,W = input_data.size()
             # input_data = input_data.view(B, N, C, H, W)
             input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
+
             optimizer.zero_grad()
             pred_voxels, pred_class = model(input_data)
             # TODO loss voxels
@@ -59,6 +60,7 @@ def train(model, trainloader, valloader, device, config):
 
             # validation evaluation and logging
             if iteration % config['validate_every_n'] == (config['validate_every_n'] - 1):
+                print(f'[{epoch:03d}/{i:05d}] Start validation.')
 
                 # set model to eval, important if your network has e.g. dropout or batchnorm layers
                 model.eval()
@@ -72,6 +74,7 @@ def train(model, trainloader, valloader, device, config):
                     ShapeNetMultiview.move_batch_to_device(batch_val, device)
                     input_data, target_labels, target_voxels = batch_val['item'], batch_val['label'], batch_val['voxel']
                     input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
+
                     with torch.no_grad():
                         # prediction = model(input_data)
                         pred_voxels, pred_class = model(input_data)
@@ -143,18 +146,18 @@ def main(config):
         train_dataset,   # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
         batch_size=config['batch_size'],   # The size of batches is defined here
         shuffle=True,    # Shuffling the order of samples is useful during training to prevent that the network learns to depend on the order of the input data
-        num_workers=0,   # Data is usually loaded in parallel by num_workers
+        num_workers=config.get('num_workers', 4),   # Data is usually loaded in parallel by num_workers
         pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
     )
 
-    val_dataset = ShapeNetMultiview('val' if not config['is_overfit'] else 'overfit', total_views=24, 
+    val_dataset = ShapeNetMultiview(config.get('dataset', 'val') if not config['is_overfit'] else 'overfit', total_views=24, 
                                     num_views=config.get('num_views', 12), load_mode='mvcnn_rec',
                                     random_start_view=False)
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,     # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
         batch_size=config['batch_size'],   # The size of batches is defined here
         shuffle=False,   # During validation, shuffling is not necessary anymore
-        num_workers=0,   # Data is usually loaded in parallel by num_workers
+        num_workers=config.get('num_workers', 4),   # Data is usually loaded in parallel by num_workers
         pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
     )
 
