@@ -23,16 +23,18 @@ class InferenceHandlerMVCNNReconstruction:
         :param voxel_thresh: threshold for voxel in range (0, 1)
         :return: class category name for the voxels, as predicted by the model
         """
-        input_tensor = torch.unsqueeze(images, 1) # N_views x 1 x 3 x 224 x 224
+        input_data = torch.unsqueeze(images, 1) # N_views x 1 x 3 x 224 x 224
 
-        voxel_pred, class_prediction = self.model(input_tensor)
+        with torch.no_grad():
+            # prediction = model(input_data)
+            pred_voxels, pred_class = self.model(input_data)
         # Class
-        predicted_label = torch.argmax(class_prediction, dim=1)
+        predicted_label = torch.argmax(pred_class, dim=1)
         class_id = predicted_label.item()
         class_name = ShapeNetMultiview.id_class_mapping[class_id]
 
         # Thresh hold voxel
-        predited_voxel = (voxel_pred > voxel_thresh).numpy()
+        predited_voxel = (pred_voxels.squeeze(0) > voxel_thresh).numpy()
         return class_name, predited_voxel
 
 
