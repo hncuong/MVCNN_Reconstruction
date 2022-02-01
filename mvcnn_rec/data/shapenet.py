@@ -42,6 +42,7 @@ class ShapeNetMultiview(torch.utils.data.Dataset):
         assert split in ['train', 'test', 'val', 'overfit']
         self.items = []
         self.classes = {}
+        self.items_by_class = {}
         
         self.total_views = total_views
         self.num_views = num_views
@@ -57,9 +58,11 @@ class ShapeNetMultiview(torch.utils.data.Dataset):
 
         for taxonomy in dataset_taxonomy:
             self.classes[taxonomy['taxonomy_id']] = taxonomy['taxonomy_name']
-            #print('"%s": "%s"' % (taxonomy['taxonomy_name'], taxonomy['taxonomy_id']))
+            print('"%s": "%s"' % (taxonomy['taxonomy_name'], taxonomy['taxonomy_id']))
+            self.items_by_class[taxonomy['taxonomy_name']] = []
             for item in taxonomy.get(split, []):
                 self.items.append("%s/%s" % (taxonomy['taxonomy_id'], item))
+                self.items_by_class[taxonomy['taxonomy_name']].append("%s/%s" % (taxonomy['taxonomy_id'], item))
 
     def __getitem__(self, index):
         item = self.items[index]
@@ -86,6 +89,29 @@ class ShapeNetMultiview(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.items)
+    
+    def get_item_by_class(self, index, class_name):
+        item = self.items_by_class[class_name][index]
+        # print(f"item: {item}")
+        item_class = item.split('/')[0]
+        start_view_idx = 0
+        if self.random_start_view:
+            start_view_idx = np.random.randint(0, self.stride)
+        images = ShapeNetMultiview.get_images(item, self.num_views, self.total_views, start_view_idx)
+        if (self.load_mode == 'mvcnn_rec'):
+            voxel = ShapeNetMultiview.get_voxel(item)
+            return {
+                "name": item,
+                "item": images,
+                "voxel": voxel, # TODO check if should be new_axis here.
+                "label": ShapeNetMultiview.class_ids[self.classes[item_class]]
+            }
+        else:
+            return {
+                "name": item,
+                "item": images,
+                "label": ShapeNetMultiview.class_ids[self.classes[item_class]]
+            }
 
     @staticmethod
     def get_voxel(item):
