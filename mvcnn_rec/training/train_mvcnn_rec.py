@@ -8,17 +8,14 @@ from mvcnn_rec.data.shapenet import ShapeNetMultiview
 def train(model, trainloader, valloader, device, config):
     loss_class_criterion = torch.nn.CrossEntropyLoss()
     loss_class_criterion = loss_class_criterion.to(device)
-
     # TODO Reconstruction loss for voxels. Change to BCEWithLogitsLoss if output is logits.
     # loss_voxels = torch.nn.BCEWithLogitsLoss() 
     loss_voxels_criterion = torch.nn.BCELoss()
     loss_voxels_criterion = loss_voxels_criterion.to(device)
-
     # TODO Weight of losses
     loss_class_weight = config.get('loss_class_weight', 0.5)
     loss_voxel_weight = config.get('loss_voxel_weight', 0.5)
     voxel_thresh = config.get('voxel_thresh', 0.3)
-
     optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
 
     # lr scheduler
@@ -32,18 +29,18 @@ def train(model, trainloader, valloader, device, config):
 
     # keep track of running average of train loss for printing
     train_loss_running = 0.
-
     for epoch in range(config['max_epochs']):
         for i, batch in enumerate(trainloader):
             # move batch to device
             ShapeNetMultiview.move_batch_to_device(batch, device)
-            # TODO data voxels (update name)
-            input_data, target_labels, target_voxels = batch['images'], batch['label'], batch['voxel']
+            input_data, target_labels, target_voxels = batch['item'], batch['label'], batch['voxel']
+            # TODO Reshape inpute_data to [N_images, B, 3, H, W] (H, W = 222)
+            # N,B,C,H,W = input_data.size()
+            # input_data = input_data.view(B, N, C, H, W)
+            input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
 
             optimizer.zero_grad()
-
-            pred_class, pred_voxels = model(input_data)
-
+            pred_voxels, pred_class = model(input_data)
             # TODO loss voxels
             loss_class = loss_class_criterion(pred_class, target_labels)
             loss_voxel = loss_voxels_criterion(pred_voxels, target_voxels)
@@ -63,6 +60,7 @@ def train(model, trainloader, valloader, device, config):
 
             # validation evaluation and logging
             if iteration % config['validate_every_n'] == (config['validate_every_n'] - 1):
+                print(f'[{epoch:03d}/{i:05d}] Start validation.')
 
                 # set model to eval, important if your network has e.g. dropout or batchnorm layers
                 model.eval()
@@ -74,12 +72,12 @@ def train(model, trainloader, valloader, device, config):
                 # forward pass and evaluation for entire validation set
                 for batch_val in valloader:
                     ShapeNetMultiview.move_batch_to_device(batch_val, device)
-                    input_data, target_labels, target_voxels = batch_val['images'], batch_val['label'], batch_val['voxel']
+                    input_data, target_labels, target_voxels = batch_val['item'], batch_val['label'], batch_val['voxel']
+                    input_data = torch.swapaxes(input_data, 0, 1) # TODO Need to fix
 
                     with torch.no_grad():
                         # prediction = model(input_data)
-                        pred_class, pred_voxels = model(input_data)
-                    
+                        pred_voxels, pred_class = model(input_data)
                     loss_total_val += loss_class_weight * loss_class_criterion(pred_class, target_labels).item() + \
                             loss_voxel_weight * loss_voxels_criterion(pred_voxels, target_voxels).item()
                           
@@ -141,21 +139,25 @@ def main(config):
         print('Using CPU')
 
     # Create Dataloaders
-    train_dataset = ShapeNetMultiview('train' if not config['is_overfit'] else 'overfit')
+    train_dataset = ShapeNetMultiview('train' if not config['is_overfit'] else 'overfit', total_views=24, 
+                                    num_views=config.get('num_views', 12), load_mode='mvcnn_rec', 
+                                    random_start_view=config.get('random_start_view', False))
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,   # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
         batch_size=config['batch_size'],   # The size of batches is defined here
         shuffle=True,    # Shuffling the order of samples is useful during training to prevent that the network learns to depend on the order of the input data
-        num_workers=4,   # Data is usually loaded in parallel by num_workers
+        num_workers=config.get('num_workers', 4),   # Data is usually loaded in parallel by num_workers
         pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
     )
 
-    val_dataset = ShapeNetMultiview('val' if not config['is_overfit'] else 'overfit')
+    val_dataset = ShapeNetMultiview(config.get('dataset', 'val') if not config['is_overfit'] else 'overfit', total_views=24, 
+                                    num_views=config.get('num_views', 12), load_mode='mvcnn_rec',
+                                    random_start_view=False)
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,     # Datasets return data one sample at a time; Dataloaders use them and aggregate samples into batches
         batch_size=config['batch_size'],   # The size of batches is defined here
         shuffle=False,   # During validation, shuffling is not necessary anymore
-        num_workers=4,   # Data is usually loaded in parallel by num_workers
+        num_workers=config.get('num_workers', 4),   # Data is usually loaded in parallel by num_workers
         pin_memory=True  # This is an implementation detail to speed up data uploading to the GPU
     )
 
